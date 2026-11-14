@@ -220,6 +220,160 @@ function upscaleClip(it, w, onProgress) {
 
   const share = async () => {
     if (sel?.out && (await Sharing.isAvailableAsync())) Sharing.shareAsync(sel.out);
-  };
+  };return (
+    <SafeAreaProvider>
+      <SafeAreaView style={s.root}>
+        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+        <ScrollView contentContainerStyle={s.scroll}>
+          <Text style={s.title}>Video optimizer</Text>
+          <Text style={s.lead}>Shrink big clips up to 4K without losing the detail you care about.</Text>
+
+          {!items.length ? (
+            <Pressable onPress={pick} style={s.drop}>
+              <Text style={s.dropTitle}>Choose videos</Text>
+              <Text style={s.dropSub}>Pick up to 10 clips from your photo library</Text>
+            </Pressable>
+          ) : (
+            <>
+              <View style={s.frame}>
+                <Preview key={previewUri} uri={previewUri} />
+              </View>
+              {sel?.out ? (
+                <Segmented value={showing} onChange={setShowing} options={[{ key: 'original', label: 'Original' }, { key: 'optimized', label: 'Optimized' }]} />
+              ) : null}
+
+              <View style={s.listHead}>
+                <Text style={s.section}>Queue ({items.length})</Text>
+                <Pressable onPress={pick} disabled={busy}><Text style={s.link}>Add videos</Text></Pressable>
+              </View>
+              {items.map((it, n) => (
+                <Pressable key={it.id} onPress={() => setSelectedId(it.id)} style={[s.row, it.id === sel?.id && s.rowOn]}>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={s.rowTitle}>Clip {n + 1}</Text>
+                    <Text style={s.meta}>{it.width}×{it.height}  {clock(it.duration)}  {it.size ? mb(it.size) : ''}</Text>
+                    {it.status === 'working' ? (
+                      <View style={[s.track, { marginTop: 6 }]}><View style={[s.fill, { width: `${Math.round(it.progress * 100)}%` }]} /></View>
+                    ) : null}
+                  </View>
+                  <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                    <Text style={[s.status, it.status === 'done' && { color: C.pink }, it.status === 'failed' && { color: '#FF4D4D' }]}>{statusText(it)}</Text>
+                    {!busy ? (
+                      <Pressable onPress={() => setItems((p) => p.filter((x) => x.id !== it.id))} hitSlop={8}><Text style={s.link}>Remove</Text></Pressable>
+                    ) : null}
+                  </View>
+                </Pressable>
+              ))}
+
+              <Text style={s.section}>Presets</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {PRESETS.map((p) => (
+                  <Pressable key={p.label} disabled={busy} onPress={() => applyPreset(p)} style={s.chip}>
+                    <Text style={s.chipText}>{p.label}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+
+              <Segmented options={MODES} value={mode} onChange={setMode} disabled={busy} />
+              {mode === 'upscale' ? (
+                <>
+                  <Text style={s.section}>Upscale to</Text>
+                  <Segmented options={UPSCALES} value={upKey} onChange={setUpKey} disabled={busy} />
+                </>
+              ) : (
+                <>
+                  <Text style={s.section}>Resolution</Text>
+                  <Segmented options={RESOLUTIONS} value={resKey} onChange={setResKey} disabled={busy} />
+                </>
+              )}
+              {mode === 'quality' ? (
+                <>
+                  <Text style={s.section}>Quality</Text>
+                  <Segmented options={QUALITIES} value={qualKey} onChange={setQualKey} disabled={busy} />
+                </>
+              ) : null}
+              {mode === 'size' ? (
+                <>
+                  <Text style={s.section}>Keep each video under</Text>
+                  <Segmented options={TARGETS} value={targetKey} onChange={setTargetKey} disabled={busy} />
+                </>
+              ) : null}
+              <Text style={s.hint}>
+                {mode === 'upscale'
+                  ? 'Enlarges with sharpening and light noise cleanup. It makes clips bigger and crisper, but it cannot invent real detail like AI tools do. Expect several minutes per minute of video, and bigger files.'
+                  : `${pending.length ? `About ${mb(estimate)} for ${pending.length} video${pending.length > 1 ? 's' : ''}. ` : ''}Clips smaller than the chosen resolution are not enlarged. Very short size targets on long clips can look soft.`}
+              </Text>
+
+              {busy ? (
+                <Button title="Cancel" kind="ghost" onPress={cancel} />
+              ) : pending.length ? (
+                <Button title={`${mode === 'upscale' ? 'Upscale' : 'Optimize'} ${pending.length} video${pending.length > 1 ? 's' : ''}`} onPress={() => run(false)} />
+              ) : (
+                <Button title="Redo with these settings" onPress={() => run(true)} />
+              )}
+
+              {done.length && !busy ? (
+                <View style={s.result}>
+                  <Text style={s.big}>{allUp ? 'UHD ready' : savedPct > 0 ? `−${savedPct}%` : 'No savings'}</Text>
+                  <Text style={s.hint}>
+                    {mb(origTotal)} to {mb(outTotal)} across {done.length} video{done.length > 1 ? 's' : ''}.
+                    {!allUp && savedPct <= 0 ? ' These clips are already compact, so keep the originals or pick a lower setting.' : ''}
+                  </Text>
+                  <View style={s.actions}>
+                    <View style={{ flex: 1 }}><Button title="Save all" onPress={saveAll} /></View>
+                    <View style={{ flex: 1 }}><Button title="Share clip" kind="ghost" onPress={share} /></View>
+                  </View>
+                </View>
+              ) : null}
+            </>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </SafeAreaProvider>
+  );
+}
+
+// Deep violet-black base, neon cyan for actions, hot pink for results.
+const C = { bg: '#0A0714', card: '#141026', ink: '#F4F1FF', mute: '#9A93B8', line: '#2E2750', neon: '#00E5FF', pink: '#FF2E93' };
+
+const glow = (color, radius = 12) => ({ shadowColor: color, shadowOpacity: 0.9, shadowRadius: radius, shadowOffset: { width: 0, height: 0 }, elevation: 8 });
+
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.bg },
+  scroll: { padding: 20, gap: 14, paddingBottom: 48 },
+  title: { fontSize: 34, fontWeight: '800', color: C.neon, letterSpacing: -0.8, textShadowColor: C.neon, textShadowRadius: 14, textShadowOffset: { width: 0, height: 0 } },
+  lead: { fontSize: 16, lineHeight: 22, color: C.mute, marginBottom: 6 },
+  drop: { height: 220, borderRadius: 20, borderWidth: 2, borderColor: C.neon, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: C.card, ...glow(C.neon, 14) },
+  dropTitle: { fontSize: 22, fontWeight: '800', color: C.neon, textShadowColor: C.neon, textShadowRadius: 10, textShadowOffset: { width: 0, height: 0 } },
+  dropSub: { fontSize: 14, color: C.mute },
+  frame: { borderRadius: 16, overflow: 'hidden', backgroundColor: '#000', borderWidth: 1, borderColor: C.line },
+  video: { width: '100%', aspectRatio: 16 / 9 },
+  listHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  row: { flexDirection: 'row', gap: 12, padding: 14, borderRadius: 14, backgroundColor: C.card, borderWidth: 1.5, borderColor: C.line },
+  rowOn: { borderColor: C.neon, ...glow(C.neon, 8) },
+  rowTitle: { fontSize: 16, fontWeight: '700', color: C.ink },
+  status: { fontSize: 13, fontWeight: '700', color: C.mute },
+  meta: { fontSize: 13, color: C.mute, fontVariant: ['tabular-nums'] },
+  link: { fontSize: 14, fontWeight: '700', color: C.neon },
+  section: { fontSize: 15, fontWeight: '700', color: C.ink, marginTop: 6 },
+  chip: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.neon },
+  chipText: { fontSize: 14, fontWeight: '700', color: C.neon },
+  segment: { flexDirection: 'row', backgroundColor: C.card, borderRadius: 14, padding: 4, borderWidth: 1, borderColor: C.line },
+  segItem: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
+  segOn: { backgroundColor: C.neon, ...glow(C.neon, 8) },
+  segLabel: { fontSize: 15, fontWeight: '700', color: C.ink },
+  segLabelOn: { color: C.bg },
+  segNote: { fontSize: 11, color: C.mute, marginTop: 2 },
+  segNoteOn: { color: '#05414A' },
+  hint: { fontSize: 13, lineHeight: 18, color: C.mute },
+  btn: { height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  btnPrimary: { backgroundColor: C.neon, ...glow(C.neon, 14) },
+  btnGhost: { backgroundColor: C.card, borderWidth: 1.5, borderColor: C.neon },
+  btnText: { fontSize: 16, fontWeight: '800', color: C.bg },
+  track: { height: 6, borderRadius: 3, backgroundColor: C.line, overflow: 'hidden' },
+  fill: { height: '100%', backgroundColor: C.neon },
+  result: { backgroundColor: C.card, borderRadius: 18, padding: 18, gap: 8, borderWidth: 1, borderColor: C.pink, ...glow(C.pink, 12) },
+  big: { fontSize: 44, fontWeight: '800', color: C.pink, letterSpacing: -1, textShadowColor: C.pink, textShadowRadius: 14, textShadowOffset: { width: 0, height: 0 } },
+  actions: { flexDirection: 'row', gap: 10, marginTop: 6 },
+});
 
   
