@@ -38,6 +38,26 @@ const MODES = [
 const PRESETS = [
   { label: 'Archive', mode: 'quality', res: '4k', q: 'max' },
   { label: 'Everyday', mode: 'quality', res: '1080', q: 'balanced' },
+  { label: 'Message', mode: 'size', res: '720', t: '16' },
+  { label: 'Email', mode: 'size', res: '720', t: '25' },
+  { label: 'UHD', mode: 'upscale', up: '4k' },
+];
+
+const MB = 1048576;
+const mb = (b) => `${(b / MB).toFixed(b > 99 * MB ? 0 : 1)} MB`;
+const clock = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+const asFileUri = (p) => (p.startsWith('file://') ? p : `file://${p}`);
+
+function Preview({ uri }) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = true;
+  });
+  return <VideoView player={player} style={s.video} contentFit="contain" nativeControls />;
+}
+
+function Segmented({ options, value, onChange, disabled }) {
+  return (
+    <View style={s.segment}>
       {options.map((o) => {
         const on = o.key === value;
         return (
@@ -79,97 +99,3 @@ function upscaleClip(it, w, onProgress) {
     );
   });
 }
-
-        setSelectedId((cur) => cur ?? it.id);
-      } catch (e) {
-        patch(it.id, { status: cancelled.current ? 'waiting' : 'failed' });
-      }
-    }
-    setBusy(false);
-  };
-
-  const cancel = () => {
-    cancelled.current = true;
-    if (mode === 'upscale') FFmpegKit.cancel();
-    else if (cancelId.current) Compressor.cancelCompression(cancelId.current);
-  };
-
-  const saveAll = async () => {
-    try {
-      const perm = await MediaLibrary.requestPermissionsAsync(true);
-      if (!perm.granted) return Alert.alert('Allow photo access', 'Turn on photo access for this app in Settings to save videos.');
-      for (const it of done) await MediaLibrary.saveToLibraryAsync(it.out);
-      Alert.alert('Saved', `${done.length} optimized video${done.length > 1 ? 's are' : ' is'} in your photo library.`);
-    } catch {
-      // Play-compliant Android builds block media read permissions, so the share sheet saves the selected clip instead.
-      share();
-    }
-  };
-
-  const share = async () => {
-    if (sel?.out && (await Sharing.isAvailableAsync())) Sharing.shareAsync(sel.out);
-  };
-
-  const statusText = (it) => {
-    if (it.status === 'working') return `${Math.round(it.progress * 100)}%`;
-    if (it.status === 'done') {
-      if (it.up) return `Upscaled, ${mb(it.outSize)}`;
-      return it.outSize >= it.size ? 'No savings' : `−${Math.round((1 - it.outSize / it.size) * 100)}% to ${mb(it.outSize)}`;
-    }
-    if (it.status === 'skipped') return mode === 'upscale' ? 'Already that size' : 'Already under target';
-    if (it.status === 'failed') return 'Failed';
-    return 'Ready';
-  };
-
-              ) : null}
-            </>
-          )}
-        </ScrollView>
-      </SafeAreaView>
-    </SafeAreaProvider>
-  );
-}
-
-// Deep violet-black base, neon cyan for actions, hot pink for results.
-const C = { bg: '#0A0714', card: '#141026', ink: '#F4F1FF', mute: '#9A93B8', line: '#2E2750', neon: '#00E5FF', pink: '#FF2E93' };
-
-const glow = (color, radius = 12) => ({ shadowColor: color, shadowOpacity: 0.9, shadowRadius: radius, shadowOffset: { width: 0, height: 0 }, elevation: 8 });
-
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
-  scroll: { padding: 20, gap: 14, paddingBottom: 48 },
-  title: { fontSize: 34, fontWeight: '800', color: C.neon, letterSpacing: -0.8, textShadowColor: C.neon, textShadowRadius: 14, textShadowOffset: { width: 0, height: 0 } },
-  lead: { fontSize: 16, lineHeight: 22, color: C.mute, marginBottom: 6 },
-  drop: { height: 220, borderRadius: 20, borderWidth: 2, borderColor: C.neon, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: C.card, ...glow(C.neon, 14) },
-  dropTitle: { fontSize: 22, fontWeight: '800', color: C.neon, textShadowColor: C.neon, textShadowRadius: 10, textShadowOffset: { width: 0, height: 0 } },
-  dropSub: { fontSize: 14, color: C.mute },
-  frame: { borderRadius: 16, overflow: 'hidden', backgroundColor: '#000', borderWidth: 1, borderColor: C.line },
-  video: { width: '100%', aspectRatio: 16 / 9 },
-  listHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  row: { flexDirection: 'row', gap: 12, padding: 14, borderRadius: 14, backgroundColor: C.card, borderWidth: 1.5, borderColor: C.line },
-  rowOn: { borderColor: C.neon, ...glow(C.neon, 8) },
-  rowTitle: { fontSize: 16, fontWeight: '700', color: C.ink },
-  status: { fontSize: 13, fontWeight: '700', color: C.mute },
-  meta: { fontSize: 13, color: C.mute, fontVariant: ['tabular-nums'] },
-  link: { fontSize: 14, fontWeight: '700', color: C.neon },
-  section: { fontSize: 15, fontWeight: '700', color: C.ink, marginTop: 6 },
-  chip: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.neon },
-  chipText: { fontSize: 14, fontWeight: '700', color: C.neon },
-  segment: { flexDirection: 'row', backgroundColor: C.card, borderRadius: 14, padding: 4, borderWidth: 1, borderColor: C.line },
-  segItem: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  segOn: { backgroundColor: C.neon, ...glow(C.neon, 8) },
-  segLabel: { fontSize: 15, fontWeight: '700', color: C.ink },
-  segLabelOn: { color: C.bg },
-  segNote: { fontSize: 11, color: C.mute, marginTop: 2 },
-  segNoteOn: { color: '#05414A' },
-  hint: { fontSize: 13, lineHeight: 18, color: C.mute },
-  btn: { height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  btnPrimary: { backgroundColor: C.neon, ...glow(C.neon, 14) },
-  btnGhost: { backgroundColor: C.card, borderWidth: 1.5, borderColor: C.neon },
-  btnText: { fontSize: 16, fontWeight: '800', color: C.bg },
-  track: { height: 6, borderRadius: 3, backgroundColor: C.line, overflow: 'hidden' },
-  fill: { height: '100%', backgroundColor: C.neon },
-  result: { backgroundColor: C.card, borderRadius: 18, padding: 18, gap: 8, borderWidth: 1, borderColor: C.pink, ...glow(C.pink, 12) },
-  big: { fontSize: 44, fontWeight: '800', color: C.pink, letterSpacing: -1, textShadowColor: C.pink, textShadowRadius: 14, textShadowOffset: { width: 0, height: 0 } },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 6 },
-});
