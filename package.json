@@ -2,7 +2,7 @@
   "name": "vidopt",
   "version": "1.0.0",
   "main": "index.js",
-  "dependencies": {"@nikhil-cephei/ffmpeg-kit-react-native": "6.0.8",
+  "dependencies": {,"@nikhil-cephei/ffmpeg-kit-react-native": "6.0.8",
     "expo": "~58.0.25",
     "expo-dev-client": "~58.0.20",
     "expo-image-picker": "~58.0.10",
