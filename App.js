@@ -348,20 +348,3 @@ function upscaleClip(it, w, onProgress) {
     } catch {
       // Play-compliant Android builds block media read permissions, so the share sheet saves the selected clip instead.
       share();
-    }
-  };
-
-  const share = async () => {
-    if (sel?.out && (await Sharing.isAvailableAsync())) Sharing.shareAsync(sel.out);
-  };
-
-  const statusText = (it) => {
-    if (it.status === 'working') return `${Math.round(it.progress * 100)}%`;
-    if (it.status === 'done') {
-      if (it.up) return `Upscaled, ${mb(it.outSize)}`;
-      return it.outSize >= it.size ? 'No savings' : `−${Math.round((1 - it.outSize / it.size) * 100)}% to ${mb(it.outSize)}`;
-    }
-    if (it.status === 'skipped') return mode === 'upscale' ? 'Already that size' : 'Already under target';
-    if (it.status === 'failed') return 'Failed';
-    return 'Ready';
-  };
